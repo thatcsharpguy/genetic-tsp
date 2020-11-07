@@ -5,19 +5,19 @@ from copy import deepcopy
 from typing import Set, Tuple, List, Sequence
 import csv
 
-CROSSOVER_POINT = 0.3
-MUTATION_PROBABILITY = 0.5
+CROSSOVER_POINT = 0.6
+MUTATION_PROBABILITY = 0.9
 
-def generate_cities(city_count: int, limit: Tuple[int, int]) -> Set[City]:
+def generate_cities(city_count: int, minx:int, miny:int, maxx:int, maxy:int) -> Set[City]:
     cities = set()
-    with open("cities.csv") as readable:
+    with open("cities.csv", encoding="utf8") as readable:
         reader = csv.reader(readable)
         for raw_city in reader:
-            x = random.randint(0, limit[0])
-            y = random.randint(0, limit[1])
+            x = random.randint(minx,maxx)
+            y = random.randint(miny,maxy)
             cities.add(City(name=raw_city[0], x=x, y=y))
     
-    return random.sample(cities, city_count)
+    return set(random.sample(cities, city_count))
     
 
 def generate_population(cities: Set[City], population_size: int) -> List[Route]:
@@ -37,15 +37,12 @@ def partially_mapped_crossover(parent_s: Sequence, parent_t: Sequence):
 
     child = deepcopy(parent_s)
 
-    crossover_point = int(CROSSOVER_POINT * len(child))
-    for index_in_t, city_in_t in enumerate(parent_t[:3]):
-        try:
-            position_in_s = child.index(city_in_t)
-            child[position_in_s] = child[index_in_t]
-            child[index_in_t] = city_in_t
-        except ValueError:
-            import pdb; pdb.set_trace()
-            pass
+    crossover_qty = int(CROSSOVER_POINT * len(child))
+    crossover_point = random.randint(0, len(child) - crossover_qty - 1)
+    for index_in_t, city_in_t in enumerate(parent_t[crossover_point:crossover_point+crossover_point], crossover_point):
+        position_in_s = child.index(city_in_t)
+        child[position_in_s] = child[index_in_t]
+        child[index_in_t] = city_in_t
     return child
 
 
@@ -55,19 +52,14 @@ def crossover(routes: List[Route], population_size: int) -> List[Route]:
     new_children = []
 
     for _ in range(missing_children):
-        parent1 = random.choice(routes)
-        parent2 = random.choice(routes)
-        
-        while parent1 == parent2:
-            # are parents allowed to mate with themselves?
-            parent2 = random.choice(routes)
+        parent1, parent2 = random.sample(routes, 2)
 
         new_route = Route(partially_mapped_crossover(parent1, parent2).data)
         new_children.append(new_route)
     return new_children
 
 
-def _swap(route, to, frm):
+def _swap(route: Sequence, to:int, frm:int):
         aux = route[to]
         route[to] = route[frm]
         route[frm] = aux
@@ -77,9 +69,11 @@ def mutate(routes: List[Route]) -> List[Route]:
     mutations = []
     for route in routes:
         new_route = deepcopy(route.data)
-        if random.random() > MUTATION_PROBABILITY:
+        if MUTATION_PROBABILITY > random.random():
             swap_from = random.randint(0, len(route) -1)
-            swap_to = random.randint(0, len(route) -1)
+            swap_to = random.randint(0, len(route) - 1)
+            while swap_to == swap_from:
+                swap_to = random.randint(0, len(route) - 1)
             _swap(new_route, swap_to, swap_from)
         mutations.append(Route(new_route))
     return mutations
